@@ -28,6 +28,9 @@ const Index = () => {
   const [forecast, setForecast] = useState<ForecastDay[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [unit, setUnit] = useState<"C" | "F">("C");
+
+  const toDisplay = (c: number) => unit === "F" ? Math.round(c * 9 / 5 + 32) : c;
 
   const fetchByParams = async (params: string) => {
     setLoading(true);
@@ -195,14 +198,18 @@ const Index = () => {
               />
             </div>
             <div className="px-6 pb-4">
-              <div className="flex items-end gap-1">
-                <span className="text-6xl font-extrabold text-card-foreground leading-none">{weather.temp}</span>
-                <span className="text-2xl font-semibold text-muted-foreground mb-1">°C</span>
+              <div className="flex items-end gap-2">
+                <span className="text-6xl font-extrabold text-card-foreground leading-none">{toDisplay(weather.temp)}</span>
+                <div className="flex items-center gap-1 mb-1">
+                  <button onClick={() => setUnit("C")} className={`text-lg font-semibold transition-colors ${unit === "C" ? "text-primary" : "text-muted-foreground hover:text-card-foreground"}`}>°C</button>
+                  <span className="text-muted-foreground">/</span>
+                  <button onClick={() => setUnit("F")} className={`text-lg font-semibold transition-colors ${unit === "F" ? "text-primary" : "text-muted-foreground hover:text-card-foreground"}`}>°F</button>
+                </div>
               </div>
               <p className="text-muted-foreground capitalize mt-1">{weather.condition}</p>
             </div>
             <div className="border-t border-border grid grid-cols-3 divide-x divide-border">
-              <Stat icon={<Thermometer className="w-4 h-4" />} label="Feels like" value={`${weather.temp}°`} />
+              <Stat icon={<Thermometer className="w-4 h-4" />} label="Feels like" value={`${toDisplay(weather.temp)}°`} />
               <Stat icon={<Droplets className="w-4 h-4" />} label="Humidity" value={`${weather.humidity}%`} />
               <Stat icon={<Wind className="w-4 h-4" />} label="Wind" value={`${weather.windSpeed} m/s`} />
             </div>
@@ -226,8 +233,8 @@ const Index = () => {
                   />
                   <span className="text-xs text-muted-foreground capitalize flex-1 text-center truncate px-2">{day.condition}</span>
                   <div className="text-sm text-right">
-                    <span className="font-semibold text-card-foreground">{day.temp}°</span>
-                    <span className="text-muted-foreground ml-1">{day.tempMin}°</span>
+                    <span className="font-semibold text-card-foreground">{toDisplay(day.temp)}°</span>
+                    <span className="text-muted-foreground ml-1">{toDisplay(day.tempMin)}°</span>
                   </div>
                 </div>
               ))}
