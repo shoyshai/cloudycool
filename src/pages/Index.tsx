@@ -198,9 +198,13 @@ const Index = () => {
               />
             </div>
             <div className="px-6 pb-4">
-              <div className="flex items-end gap-1">
-                <span className="text-6xl font-extrabold text-card-foreground leading-none">{weather.temp}</span>
-                <span className="text-2xl font-semibold text-muted-foreground mb-1">°C</span>
+              <div className="flex items-end gap-2">
+                <span className="text-6xl font-extrabold text-card-foreground leading-none">{toDisplay(weather.temp)}</span>
+                <div className="flex items-center gap-1 mb-1">
+                  <button onClick={() => setUnit("C")} className={`text-lg font-semibold transition-colors ${unit === "C" ? "text-primary" : "text-muted-foreground hover:text-card-foreground"}`}>°C</button>
+                  <span className="text-muted-foreground">/</span>
+                  <button onClick={() => setUnit("F")} className={`text-lg font-semibold transition-colors ${unit === "F" ? "text-primary" : "text-muted-foreground hover:text-card-foreground"}`}>°F</button>
+                </div>
               </div>
               <p className="text-muted-foreground capitalize mt-1">{weather.condition}</p>
             </div>
