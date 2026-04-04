@@ -1,125 +1,14 @@
-import { useState, useEffect } from "react";
-import { Search, Droplets, Wind, Thermometer, MapPin, CloudOff, LocateFixed } from "lucide-react";
-
-interface WeatherData {
-  city: string;
-  country: string;
-  temp: number;
-  condition: string;
-  humidity: number;
-  windSpeed: number;
-  icon: string;
-}
-
-interface ForecastDay {
-  date: string;
-  dayName: string;
-  temp: number;
-  tempMin: number;
-  condition: string;
-  icon: string;
-}
-
-const API_KEY = "b1b15e88fa797225412429c1c50c122a1";
+import { Droplets, Wind, Thermometer, CloudOff } from "lucide-react";
+import { useWeather } from "@/hooks/useWeather";
+import CitySearch from "@/components/CitySearch";
 
 const Index = () => {
-  const [city, setCity] = useState("");
-  const [weather, setWeather] = useState<WeatherData | null>(null);
-  const [forecast, setForecast] = useState<ForecastDay[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [unit, setUnit] = useState<"C" | "F">("C");
-
-  const toDisplay = (c: number) => unit === "F" ? Math.round(c * 9 / 5 + 32) : c;
-
-  const fetchByParams = async (params: string) => {
-    setLoading(true);
-    setError("");
-    setWeather(null);
-    setForecast([]);
-
-    try {
-      const [currentRes, forecastRes] = await Promise.all([
-        fetch(`https://api.openweathermap.org/data/2.5/weather?${params}&units=metric&appid=${API_KEY}`),
-        fetch(`https://api.openweathermap.org/data/2.5/forecast?${params}&units=metric&appid=${API_KEY}`),
-      ]);
-
-      if (!currentRes.ok) throw new Error("City not found");
-      const data = await currentRes.json();
-      setCity(data.name);
-      setWeather({
-        city: data.name,
-        country: data.sys.country,
-        temp: Math.round(data.main.temp),
-        condition: data.weather[0].description,
-        humidity: data.main.humidity,
-        windSpeed: data.wind.speed,
-        icon: data.weather[0].icon,
-      });
-
-      if (forecastRes.ok) {
-        const fData = await forecastRes.json();
-        const daily = parseForecast(fData.list);
-        setForecast(daily);
-      }
-    } catch {
-      setError("Could not find that city. Please try again.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchWeather = async () => {
-    if (!city.trim()) return;
-    await fetchByParams(`q=${encodeURIComponent(city.trim())}`);
-  };
-
-  const fetchByLocation = () => {
-    if (!navigator.geolocation) {
-      setError("Geolocation is not supported by your browser.");
-      return;
-    }
-    setLoading(true);
-    navigator.geolocation.getCurrentPosition(
-      (pos) => fetchByParams(`lat=${pos.coords.latitude}&lon=${pos.coords.longitude}`),
-      () => {
-        setLoading(false);
-        setError("Location access denied. Please search manually.");
-      }
-    );
-  };
-
-  useEffect(() => {
-    fetchByLocation();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const parseForecast = (list: any[]): ForecastDay[] => {
-    const days: Record<string, any[]> = {};
-    list.forEach((item) => {
-      const date = item.dt_txt.split(" ")[0];
-      if (!days[date]) days[date] = [];
-      days[date].push(item);
-    });
-
-    const today = new Date().toISOString().split("T")[0];
-    return Object.entries(days)
-      .filter(([date]) => date !== today)
-      .slice(0, 5)
-      .map(([date, items]) => {
-        const midday = items.find((i) => i.dt_txt.includes("12:00")) || items[0];
-        const temps = items.map((i) => i.main.temp);
-        const d = new Date(date);
-        return {
-          date,
-          dayName: d.toLocaleDateString("en-US", { weekday: "short" }),
-          temp: Math.round(midday.main.temp),
-          tempMin: Math.round(Math.min(...temps)),
-          condition: midday.weather[0].description,
-          icon: midday.weather[0].icon,
-        };
-      });
-  };
+  const {
+    city, setCity, weather, forecast, loading, error,
+    unit, setUnit, toDisplay,
+    fetchWeather, fetchByLocation, fetchByCoords,
+    suggestions, setSuggestions, fetchSuggestions,
+  } = useWeather();
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center px-4 py-12"
@@ -128,44 +17,24 @@ const Index = () => {
       <div className="w-full max-w-md space-y-6">
         {/* Header */}
         <div className="text-center space-y-2">
-          <h1 className="text-4xl font-bold text-primary-foreground tracking-tight">
-            Weather App
-          </h1>
-          <p className="text-primary-foreground/70 text-sm">
-            Search any city to get current weather
-          </p>
+          <h1 className="text-4xl font-bold text-primary-foreground tracking-tight">Weather App</h1>
+          <p className="text-primary-foreground/70 text-sm">Search any city to get current weather</p>
         </div>
 
         {/* Search */}
-        <div className="flex gap-2">
-          <div className="relative flex-1">
-            <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <input
-              type="text"
-              placeholder="Enter city name..."
-              value={city}
-              onChange={(e) => setCity(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && fetchWeather()}
-              className="w-full pl-10 pr-4 py-3 rounded-lg bg-card text-card-foreground placeholder:text-muted-foreground border border-border focus:outline-none focus:ring-2 focus:ring-ring/50 transition-shadow"
-            />
-          </div>
-          <button
-            onClick={fetchWeather}
-            disabled={loading}
-            className="px-5 py-3 rounded-lg bg-primary text-primary-foreground font-medium hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center gap-2"
-          >
-            <Search className="w-4 h-4" />
-            <span className="hidden sm:inline">Search</span>
-          </button>
-          <button
-            onClick={fetchByLocation}
-            disabled={loading}
-            className="px-3 py-3 rounded-lg bg-card text-card-foreground border border-border hover:bg-accent transition-colors disabled:opacity-50"
-            title="Use my location"
-          >
-            <LocateFixed className="w-4 h-4" />
-          </button>
-        </div>
+        <CitySearch
+          city={city}
+          setCity={setCity}
+          loading={loading}
+          suggestions={suggestions}
+          onSearch={fetchWeather}
+          onLocate={fetchByLocation}
+          onSelectSuggestion={(s) => {
+            setSuggestions([]);
+            fetchByCoords(s.lat, s.lon);
+          }}
+          onQueryChange={fetchSuggestions}
+        />
 
         {/* Loading */}
         {loading && (
@@ -191,11 +60,7 @@ const Index = () => {
                 <h2 className="text-2xl font-bold text-card-foreground">{weather.city}</h2>
                 <p className="text-muted-foreground text-sm">{weather.country}</p>
               </div>
-              <img
-                src={`https://openweathermap.org/img/wn/${weather.icon}@2x.png`}
-                alt={weather.condition}
-                className="w-20 h-20"
-              />
+              <img src={`https://openweathermap.org/img/wn/${weather.icon}@2x.png`} alt={weather.condition} className="w-20 h-20" />
             </div>
             <div className="px-6 pb-4">
               <div className="flex items-end gap-2">
@@ -226,11 +91,7 @@ const Index = () => {
               {forecast.map((day) => (
                 <div key={day.date} className="flex items-center justify-between px-6 py-3">
                   <span className="text-sm font-medium text-card-foreground w-10">{day.dayName}</span>
-                  <img
-                    src={`https://openweathermap.org/img/wn/${day.icon}.png`}
-                    alt={day.condition}
-                    className="w-10 h-10"
-                  />
+                  <img src={`https://openweathermap.org/img/wn/${day.icon}.png`} alt={day.condition} className="w-10 h-10" />
                   <span className="text-xs text-muted-foreground capitalize flex-1 text-center truncate px-2">{day.condition}</span>
                   <div className="text-sm text-right">
                     <span className="font-semibold text-card-foreground">{toDisplay(day.temp)}°</span>
