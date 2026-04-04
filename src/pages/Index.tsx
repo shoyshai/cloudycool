@@ -233,8 +233,8 @@ const Index = () => {
                   />
                   <span className="text-xs text-muted-foreground capitalize flex-1 text-center truncate px-2">{day.condition}</span>
                   <div className="text-sm text-right">
-                    <span className="font-semibold text-card-foreground">{day.temp}°</span>
-                    <span className="text-muted-foreground ml-1">{day.tempMin}°</span>
+                    <span className="font-semibold text-card-foreground">{toDisplay(day.temp)}°</span>
+                    <span className="text-muted-foreground ml-1">{toDisplay(day.tempMin)}°</span>
                   </div>
                 </div>
               ))}
