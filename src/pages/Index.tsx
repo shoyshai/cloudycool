@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Search, Droplets, Wind, Thermometer, MapPin, CloudOff } from "lucide-react";
+import { Search, Droplets, Wind, Thermometer, MapPin, CloudOff, LocateFixed } from "lucide-react";
 
 interface WeatherData {
   city: string;
