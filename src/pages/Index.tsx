@@ -209,7 +209,7 @@ const Index = () => {
               <p className="text-muted-foreground capitalize mt-1">{weather.condition}</p>
             </div>
             <div className="border-t border-border grid grid-cols-3 divide-x divide-border">
-              <Stat icon={<Thermometer className="w-4 h-4" />} label="Feels like" value={`${weather.temp}°`} />
+              <Stat icon={<Thermometer className="w-4 h-4" />} label="Feels like" value={`${toDisplay(weather.temp)}°`} />
               <Stat icon={<Droplets className="w-4 h-4" />} label="Humidity" value={`${weather.humidity}%`} />
               <Stat icon={<Wind className="w-4 h-4" />} label="Wind" value={`${weather.windSpeed} m/s`} />
             </div>
