@@ -28,6 +28,9 @@ const Index = () => {
   const [forecast, setForecast] = useState<ForecastDay[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [unit, setUnit] = useState<"C" | "F">("C");
+
+  const toDisplay = (c: number) => unit === "F" ? Math.round(c * 9 / 5 + 32) : c;
 
   const fetchByParams = async (params: string) => {
     setLoading(true);
