@@ -11,11 +11,21 @@ interface WeatherData {
   icon: string;
 }
 
-const API_KEY = "b1b15e88fa797225412429c1c50c122a1"; // OpenWeatherMap demo key
+interface ForecastDay {
+  date: string;
+  dayName: string;
+  temp: number;
+  tempMin: number;
+  condition: string;
+  icon: string;
+}
+
+const API_KEY = "b1b15e88fa797225412429c1c50c122a1";
 
 const Index = () => {
   const [city, setCity] = useState("");
   const [weather, setWeather] = useState<WeatherData | null>(null);
+  const [forecast, setForecast] = useState<ForecastDay[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -24,13 +34,17 @@ const Index = () => {
     setLoading(true);
     setError("");
     setWeather(null);
+    setForecast([]);
 
     try {
-      const res = await fetch(
-        `https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(city.trim())}&units=metric&appid=${API_KEY}`
-      );
-      if (!res.ok) throw new Error("City not found");
-      const data = await res.json();
+      const q = encodeURIComponent(city.trim());
+      const [currentRes, forecastRes] = await Promise.all([
+        fetch(`https://api.openweathermap.org/data/2.5/weather?q=${q}&units=metric&appid=${API_KEY}`),
+        fetch(`https://api.openweathermap.org/data/2.5/forecast?q=${q}&units=metric&appid=${API_KEY}`),
+      ]);
+
+      if (!currentRes.ok) throw new Error("City not found");
+      const data = await currentRes.json();
       setWeather({
         city: data.name,
         country: data.sys.country,
@@ -40,11 +54,44 @@ const Index = () => {
         windSpeed: data.wind.speed,
         icon: data.weather[0].icon,
       });
+
+      if (forecastRes.ok) {
+        const fData = await forecastRes.json();
+        const daily = parseForecast(fData.list);
+        setForecast(daily);
+      }
     } catch {
       setError("Could not find that city. Please try again.");
     } finally {
       setLoading(false);
     }
+  };
+
+  const parseForecast = (list: any[]): ForecastDay[] => {
+    const days: Record<string, any[]> = {};
+    list.forEach((item) => {
+      const date = item.dt_txt.split(" ")[0];
+      if (!days[date]) days[date] = [];
+      days[date].push(item);
+    });
+
+    const today = new Date().toISOString().split("T")[0];
+    return Object.entries(days)
+      .filter(([date]) => date !== today)
+      .slice(0, 5)
+      .map(([date, items]) => {
+        const midday = items.find((i) => i.dt_txt.includes("12:00")) || items[0];
+        const temps = items.map((i) => i.main.temp);
+        const d = new Date(date);
+        return {
+          date,
+          dayName: d.toLocaleDateString("en-US", { weekday: "short" }),
+          temp: Math.round(midday.main.temp),
+          tempMin: Math.round(Math.min(...temps)),
+          condition: midday.weather[0].description,
+          icon: midday.weather[0].icon,
+        };
+      });
   };
 
   return (
@@ -104,12 +151,9 @@ const Index = () => {
         {/* Result Card */}
         {weather && (
           <div className="rounded-xl bg-card/80 backdrop-blur-md overflow-hidden animate-fade-in-up" style={{ boxShadow: "var(--shadow-elevated)" }}>
-            {/* City & Icon */}
             <div className="p-6 pb-2 flex items-center justify-between">
               <div>
-                <h2 className="text-2xl font-bold text-card-foreground">
-                  {weather.city}
-                </h2>
+                <h2 className="text-2xl font-bold text-card-foreground">{weather.city}</h2>
                 <p className="text-muted-foreground text-sm">{weather.country}</p>
               </div>
               <img
@@ -118,23 +162,43 @@ const Index = () => {
                 className="w-20 h-20"
               />
             </div>
-
-            {/* Temperature */}
             <div className="px-6 pb-4">
               <div className="flex items-end gap-1">
-                <span className="text-6xl font-extrabold text-card-foreground leading-none">
-                  {weather.temp}
-                </span>
+                <span className="text-6xl font-extrabold text-card-foreground leading-none">{weather.temp}</span>
                 <span className="text-2xl font-semibold text-muted-foreground mb-1">°C</span>
               </div>
               <p className="text-muted-foreground capitalize mt-1">{weather.condition}</p>
             </div>
-
-            {/* Stats */}
             <div className="border-t border-border grid grid-cols-3 divide-x divide-border">
               <Stat icon={<Thermometer className="w-4 h-4" />} label="Feels like" value={`${weather.temp}°`} />
               <Stat icon={<Droplets className="w-4 h-4" />} label="Humidity" value={`${weather.humidity}%`} />
               <Stat icon={<Wind className="w-4 h-4" />} label="Wind" value={`${weather.windSpeed} m/s`} />
+            </div>
+          </div>
+        )}
+
+        {/* 5-Day Forecast */}
+        {forecast.length > 0 && (
+          <div className="rounded-xl bg-card/80 backdrop-blur-md overflow-hidden animate-fade-in-up" style={{ boxShadow: "var(--shadow-card)" }}>
+            <div className="px-6 py-4 border-b border-border">
+              <h3 className="text-sm font-semibold text-card-foreground uppercase tracking-wide">5-Day Forecast</h3>
+            </div>
+            <div className="divide-y divide-border">
+              {forecast.map((day) => (
+                <div key={day.date} className="flex items-center justify-between px-6 py-3">
+                  <span className="text-sm font-medium text-card-foreground w-10">{day.dayName}</span>
+                  <img
+                    src={`https://openweathermap.org/img/wn/${day.icon}.png`}
+                    alt={day.condition}
+                    className="w-10 h-10"
+                  />
+                  <span className="text-xs text-muted-foreground capitalize flex-1 text-center truncate px-2">{day.condition}</span>
+                  <div className="text-sm text-right">
+                    <span className="font-semibold text-card-foreground">{day.temp}°</span>
+                    <span className="text-muted-foreground ml-1">{day.tempMin}°</span>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         )}
