@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Search, Droplets, Wind, Thermometer, MapPin, CloudOff } from "lucide-react";
 
 interface WeatherData {
