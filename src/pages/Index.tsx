@@ -154,6 +154,14 @@ const Index = () => {
             <Search className="w-4 h-4" />
             <span className="hidden sm:inline">Search</span>
           </button>
+          <button
+            onClick={fetchByLocation}
+            disabled={loading}
+            className="px-3 py-3 rounded-lg bg-card text-card-foreground border border-border hover:bg-accent transition-colors disabled:opacity-50"
+            title="Use my location"
+          >
+            <LocateFixed className="w-4 h-4" />
+          </button>
         </div>
 
         {/* Loading */}
