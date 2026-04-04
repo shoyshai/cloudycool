@@ -29,22 +29,21 @@ const Index = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const fetchWeather = async () => {
-    if (!city.trim()) return;
+  const fetchByParams = async (params: string) => {
     setLoading(true);
     setError("");
     setWeather(null);
     setForecast([]);
 
     try {
-      const q = encodeURIComponent(city.trim());
       const [currentRes, forecastRes] = await Promise.all([
-        fetch(`https://api.openweathermap.org/data/2.5/weather?q=${q}&units=metric&appid=${API_KEY}`),
-        fetch(`https://api.openweathermap.org/data/2.5/forecast?q=${q}&units=metric&appid=${API_KEY}`),
+        fetch(`https://api.openweathermap.org/data/2.5/weather?${params}&units=metric&appid=${API_KEY}`),
+        fetch(`https://api.openweathermap.org/data/2.5/forecast?${params}&units=metric&appid=${API_KEY}`),
       ]);
 
       if (!currentRes.ok) throw new Error("City not found");
       const data = await currentRes.json();
+      setCity(data.name);
       setWeather({
         city: data.name,
         country: data.sys.country,
@@ -66,6 +65,31 @@ const Index = () => {
       setLoading(false);
     }
   };
+
+  const fetchWeather = async () => {
+    if (!city.trim()) return;
+    await fetchByParams(`q=${encodeURIComponent(city.trim())}`);
+  };
+
+  const fetchByLocation = () => {
+    if (!navigator.geolocation) {
+      setError("Geolocation is not supported by your browser.");
+      return;
+    }
+    setLoading(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => fetchByParams(`lat=${pos.coords.latitude}&lon=${pos.coords.longitude}`),
+      () => {
+        setLoading(false);
+        setError("Location access denied. Please search manually.");
+      }
+    );
+  };
+
+  useEffect(() => {
+    fetchByLocation();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const parseForecast = (list: any[]): ForecastDay[] => {
     const days: Record<string, any[]> = {};
