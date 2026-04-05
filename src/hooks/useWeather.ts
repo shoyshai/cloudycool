@@ -204,6 +204,21 @@ const getIpLocation = async (): Promise<{ lat: number; lon: number; city: string
   } catch { return null; }
 };
 
+// ── Hourly forecast parser ─────────────────────────────────────────
+const parseHourlyForToday = (list: any[]): HourlyForecast[] => {
+  const today = new Date().toISOString().split("T")[0];
+  const entries = list
+    .filter((item) => item.dt_txt.startsWith(today))
+    .map((item) => ({
+      time: new Date(item.dt_txt).toLocaleTimeString("en-US", { hour: "numeric", hour12: true }),
+      temp: Math.round(item.main.temp),
+      condition: item.weather[0].description,
+      icon: item.weather[0].icon,
+    }));
+  console.debug(`[hourly] Parsed ${entries.length} entries for today (${today})`);
+  return entries;
+};
+
 // ── Forecast parser ────────────────────────────────────────────────
 const parseForecast = (list: any[]): ForecastDay[] => {
   const days: Record<string, any[]> = {};
