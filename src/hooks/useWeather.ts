@@ -28,6 +28,12 @@ export interface CitySuggestion {
   lon: number;
 }
 
+export interface AqiData {
+  index: number; // 1-5
+  label: string;
+  hint: string;
+}
+
 export type LocationSource = "gps" | "saved" | "ip" | "manual" | null;
 
 // ── Constants ──────────────────────────────────────────────────────
@@ -36,9 +42,41 @@ const STORAGE_KEY = "cloudycool_last_location";
 const SAVED_MAX_AGE_MS = 30 * 60 * 1000;
 const REVERSE_GEO_TIMEOUT_MS = 5000;
 
-// ── Dynamic city-label resolver ────────────────────────────────────
+// ── AQI helpers ────────────────────────────────────────────────────
+const AQI_MAP: Record<number, { label: string; hint: string }> = {
+  1: { label: "Good", hint: "Air quality is satisfactory." },
+  2: { label: "Fair", hint: "Acceptable for most people." },
+  3: { label: "Moderate", hint: "Sensitive groups may be affected." },
+  4: { label: "Poor", hint: "Health effects possible for everyone." },
+  5: { label: "Very Poor", hint: "Serious health risk. Avoid outdoor activity." },
+};
 
-/** Fields to extract from Nominatim address, ordered by locality precision */
+const fetchAQIByCoords = async (lat: number, lon: number): Promise<AqiData | null> => {
+  console.debug(`[aqi] Fetching AQI for (${lat}, ${lon})`);
+  try {
+    const res = await fetch(
+      `https://api.openweathermap.org/data/2.5/air_pollution?lat=${lat}&lon=${lon}&appid=${API_KEY}`
+    );
+    if (!res.ok) {
+      console.warn("[aqi] API returned", res.status);
+      return null;
+    }
+    const data = await res.json();
+    const index = data.list?.[0]?.main?.aqi;
+    if (!index || !AQI_MAP[index]) {
+      console.warn("[aqi] Invalid AQI index:", index);
+      return null;
+    }
+    const result = { index, ...AQI_MAP[index] };
+    console.debug("[aqi] Success:", result);
+    return result;
+  } catch (e) {
+    console.warn("[aqi] Fetch failed:", e);
+    return null;
+  }
+};
+
+// ── Dynamic city-label resolver ────────────────────────────────────
 const CANDIDATE_FIELDS: { key: string; score: number }[] = [
   { key: "city", score: 100 },
   { key: "town", score: 95 },
@@ -51,16 +89,8 @@ const CANDIDATE_FIELDS: { key: string; score: number }[] = [
   { key: "state_district", score: 20 },
 ];
 
-interface LabelCandidate {
-  label: string;
-  field: string;
-  score: number;
-}
+interface LabelCandidate { label: string; field: string; score: number; }
 
-/**
- * Resolves the best display label from reverse-geocoding address fields
- * and the weather API's city name. Fully dynamic — no hard-coded city names.
- */
 function resolveBestLocationLabel(
   addr: Record<string, string> | null,
   weatherName: string | null,
@@ -71,7 +101,6 @@ function resolveBestLocationLabel(
   if (state) rejectSet.add(state.toLowerCase());
   if (country) rejectSet.add(country.toLowerCase());
 
-  // Collect candidates from reverse-geocoding
   const candidates: LabelCandidate[] = [];
   const seen = new Set<string>();
 
@@ -81,11 +110,7 @@ function resolveBestLocationLabel(
       if (!val) continue;
       const norm = val.trim();
       const lower = norm.toLowerCase();
-      if (seen.has(lower)) continue;
-      if (rejectSet.has(lower)) {
-        console.debug(`[label-resolver] Rejected "${norm}" (field: ${key}) — matches state/country`);
-        continue;
-      }
+      if (seen.has(lower) || rejectSet.has(lower)) continue;
       seen.add(lower);
       candidates.push({ label: norm, field: key, score });
     }
@@ -93,60 +118,37 @@ function resolveBestLocationLabel(
 
   console.debug("[label-resolver] Candidates:", candidates.map(c => `${c.label} (${c.field}: ${c.score})`));
 
-  // Best geocode candidate
   const bestGeo = candidates.length > 0
     ? candidates.reduce((a, b) => a.score >= b.score ? a : b)
     : null;
 
-  // Weather API name as a competing candidate
   const weatherNorm = weatherName?.trim() || null;
   const weatherLower = weatherNorm?.toLowerCase();
-
-  // If weather name matches state/country, discard it
   const weatherValid = weatherNorm && weatherLower && !rejectSet.has(weatherLower);
 
-  // Score the weather name: if it matches a high-scoring geo field it's good;
-  // otherwise give it a baseline of 50 (it's from a weather API, decent but not always local)
   let weatherScore = 50;
   if (weatherValid && weatherLower) {
     const matchingGeo = candidates.find(c => c.label.toLowerCase() === weatherLower);
-    if (matchingGeo) {
-      weatherScore = matchingGeo.score; // they agree — use geo score
-    }
+    if (matchingGeo) weatherScore = matchingGeo.score;
   }
 
-  console.debug(
-    `[label-resolver] Best geocode: ${bestGeo ? `"${bestGeo.label}" (${bestGeo.score})` : "none"}`,
-    `| Weather: ${weatherValid ? `"${weatherNorm}" (${weatherScore})` : "none/rejected"}`
-  );
-
-  // Decision: prefer the higher score; on tie prefer geocode (more local)
   if (bestGeo && (!weatherValid || bestGeo.score >= weatherScore)) {
-    console.debug(`[label-resolver] Winner: "${bestGeo.label}" from geocode (field: ${bestGeo.field})`);
+    console.debug(`[label-resolver] Winner: "${bestGeo.label}" from geocode`);
     return { label: bestGeo.label, source: "geocode" };
   }
   if (weatherValid && weatherNorm) {
     console.debug(`[label-resolver] Winner: "${weatherNorm}" from weather API`);
     return { label: weatherNorm, source: "weather" };
   }
-
-  console.debug("[label-resolver] No valid candidate — using fallback");
   return { label: "Current Location", source: "fallback" };
 }
 
 // ── LocalStorage helpers ───────────────────────────────────────────
-interface SavedLocation {
-  lat: number;
-  lon: number;
-  city: string;
-  state?: string;
-  ts: number;
-}
+interface SavedLocation { lat: number; lon: number; city: string; state?: string; ts: number; }
 
 const saveLocation = (loc: Omit<SavedLocation, "ts">) => {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...loc, ts: Date.now() }));
-    console.debug("[location] Saved to localStorage:", loc.city);
   } catch {}
 };
 
@@ -155,23 +157,13 @@ const loadSavedLocation = (): SavedLocation | null => {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
     const parsed: SavedLocation = JSON.parse(raw);
-    const age = Date.now() - (parsed.ts || 0);
-    if (age > SAVED_MAX_AGE_MS) {
-      console.debug("[location] Saved location expired (age:", Math.round(age / 1000), "s)");
-      return null;
-    }
+    if (Date.now() - (parsed.ts || 0) > SAVED_MAX_AGE_MS) return null;
     return parsed;
-  } catch {
-    return null;
-  }
+  } catch { return null; }
 };
 
-// ── Reverse geocoding (Nominatim) with timeout ────────────────────
-interface ReverseGeoResult {
-  addr: Record<string, string>;
-  state?: string;
-  country?: string;
-}
+// ── Reverse geocoding ──────────────────────────────────────────────
+interface ReverseGeoResult { addr: Record<string, string>; state?: string; country?: string; }
 
 const reverseGeocode = async (lat: number, lon: number): Promise<ReverseGeoResult | null> => {
   const controller = new AbortController();
@@ -185,7 +177,7 @@ const reverseGeocode = async (lat: number, lon: number): Promise<ReverseGeoResul
     if (!res.ok) return null;
     const data = await res.json();
     const addr = data.address || {};
-    console.debug("[location] Nominatim raw address:", JSON.stringify(addr));
+    console.debug("[location] Nominatim raw:", JSON.stringify(addr));
     return { addr, state: addr.state, country: addr.country };
   } catch (e) {
     clearTimeout(timer);
@@ -194,20 +186,15 @@ const reverseGeocode = async (lat: number, lon: number): Promise<ReverseGeoResul
   }
 };
 
-// ── IP-based fallback ──────────────────────────────────────────────
+// ── IP fallback ────────────────────────────────────────────────────
 const getIpLocation = async (): Promise<{ lat: number; lon: number; city: string } | null> => {
   try {
     const res = await fetch("https://ipapi.co/json/");
     if (!res.ok) return null;
     const data = await res.json();
-    if (data.latitude && data.longitude) {
-      console.debug("[location] IP location:", data.city, data.latitude, data.longitude);
-      return { lat: data.latitude, lon: data.longitude, city: data.city || "Unknown" };
-    }
+    if (data.latitude && data.longitude) return { lat: data.latitude, lon: data.longitude, city: data.city || "Unknown" };
     return null;
-  } catch {
-    return null;
-  }
+  } catch { return null; }
 };
 
 // ── Forecast parser ────────────────────────────────────────────────
@@ -242,6 +229,7 @@ export const useWeather = () => {
   const [city, setCity] = useState("");
   const [weather, setWeather] = useState<WeatherData | null>(null);
   const [forecast, setForecast] = useState<ForecastDay[]>([]);
+  const [aqi, setAqi] = useState<AqiData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [unit, setUnit] = useState<"C" | "F">("C");
@@ -253,7 +241,7 @@ export const useWeather = () => {
 
   const toDisplay = (c: number) => unit === "F" ? Math.round(c * 9 / 5 + 32) : c;
 
-  /** Core weather fetch — always by coordinates, with dynamic label resolution */
+  /** Core weather + AQI fetch — always by coordinates */
   const fetchWeatherByCoords = useCallback(async (
     lat: number, lon: number, geoResult: ReverseGeoResult | null, source: LocationSource, reqId: number
   ) => {
@@ -262,58 +250,45 @@ export const useWeather = () => {
 
     try {
       const params = `lat=${lat}&lon=${lon}`;
-      const [currentRes, forecastRes] = await Promise.all([
+      // Fetch weather + forecast + AQI in parallel; AQI uses allSettled so it can't break weather
+      const [currentRes, forecastRes, aqiResult] = await Promise.all([
         fetch(`https://api.openweathermap.org/data/2.5/weather?${params}&units=metric&appid=${API_KEY}`),
         fetch(`https://api.openweathermap.org/data/2.5/forecast?${params}&units=metric&appid=${API_KEY}`),
+        fetchAQIByCoords(lat, lon).catch(() => null),
       ]);
 
-      if (reqId !== requestIdRef.current) {
-        console.debug("[location] Discarding stale response for reqId", reqId);
-        return;
-      }
+      if (reqId !== requestIdRef.current) return;
 
       if (!currentRes.ok) throw new Error("Weather data not available");
       const data = await currentRes.json();
 
-      // Resolve best label dynamically
-      const { label: displayCity, source: labelSource } = resolveBestLocationLabel(
-        geoResult?.addr || null,
-        data.name,
-        geoResult?.state,
-        geoResult?.country
+      const { label: displayCity } = resolveBestLocationLabel(
+        geoResult?.addr || null, data.name, geoResult?.state, geoResult?.country
       );
 
-      console.debug(`[location] Final display: "${displayCity}" (labelSource: ${labelSource}, locSource: ${source}, reqId: ${reqId})`);
+      console.debug(`[location] Final: "${displayCity}" (source: ${source}, reqId: ${reqId})`);
 
       setCity(displayCity);
       setLocationSource(source);
       setWeather({
-        city: displayCity,
-        country: data.sys.country,
-        temp: Math.round(data.main.temp),
-        condition: data.weather[0].description,
-        humidity: data.main.humidity,
-        windSpeed: data.wind.speed,
-        icon: data.weather[0].icon,
+        city: displayCity, country: data.sys.country,
+        temp: Math.round(data.main.temp), condition: data.weather[0].description,
+        humidity: data.main.humidity, windSpeed: data.wind.speed, icon: data.weather[0].icon,
       });
       setForecast([]);
+      setAqi(aqiResult);
+      if (!aqiResult) console.debug("[aqi] AQI unavailable for this location");
 
       if (forecastRes.ok) {
         const fData = await forecastRes.json();
-        if (reqId === requestIdRef.current) {
-          setForecast(parseForecast(fData.list));
-        }
+        if (reqId === requestIdRef.current) setForecast(parseForecast(fData.list));
       }
 
       saveLocation({ lat, lon, city: displayCity, state: geoResult?.state });
     } catch {
-      if (reqId === requestIdRef.current) {
-        setError("Could not fetch weather data. Please try again.");
-      }
+      if (reqId === requestIdRef.current) setError("Could not fetch weather data. Please try again.");
     } finally {
-      if (reqId === requestIdRef.current) {
-        setLoading(false);
-      }
+      if (reqId === requestIdRef.current) setLoading(false);
     }
   }, []);
 
@@ -322,20 +297,17 @@ export const useWeather = () => {
     setWeather(null);
     setForecast([]);
     setSuggestions([]);
+    setAqi(null);
     return id;
   };
 
-  /** Resolve coordinates → reverse geocode → resolve label → fetch weather */
-  const resolveAndFetch = useCallback(async (
-    lat: number, lon: number, source: LocationSource
-  ) => {
+  const resolveAndFetch = useCallback(async (lat: number, lon: number, source: LocationSource) => {
     const reqId = startRequest();
     const geoResult = await reverseGeocode(lat, lon);
     if (reqId !== requestIdRef.current) return;
     await fetchWeatherByCoords(lat, lon, geoResult, source, reqId);
   }, [fetchWeatherByCoords]);
 
-  /** Manual search by city name query */
   const fetchByQuery = useCallback(async (query: string) => {
     const reqId = startRequest();
     setLoading(true);
@@ -350,17 +322,18 @@ export const useWeather = () => {
       if (!currentRes.ok) throw new Error("City not found");
       const data = await currentRes.json();
 
+      // Also fetch AQI for the searched city's coords
+      const aqiResult = await fetchAQIByCoords(data.coord.lat, data.coord.lon).catch(() => null);
+      if (reqId !== requestIdRef.current) return;
+
       setCity(data.name);
       setLocationSource("manual");
       setWeather({
-        city: data.name,
-        country: data.sys.country,
-        temp: Math.round(data.main.temp),
-        condition: data.weather[0].description,
-        humidity: data.main.humidity,
-        windSpeed: data.wind.speed,
-        icon: data.weather[0].icon,
+        city: data.name, country: data.sys.country,
+        temp: Math.round(data.main.temp), condition: data.weather[0].description,
+        humidity: data.main.humidity, windSpeed: data.wind.speed, icon: data.weather[0].icon,
       });
+      setAqi(aqiResult);
       if (forecastRes.ok) {
         const fData = await forecastRes.json();
         if (reqId === requestIdRef.current) setForecast(parseForecast(fData.list));
@@ -382,28 +355,24 @@ export const useWeather = () => {
     await resolveAndFetch(lat, lon, "manual");
   }, [resolveAndFetch]);
 
-  /** Detect location: GPS → saved (if fresh) → IP fallback */
   const detectLocation = useCallback(() => {
     setDetectingLocation(true);
     setError("");
-    console.debug("[location] Starting detection chain...");
 
     const finish = () => setDetectingLocation(false);
 
     if (!navigator.geolocation) {
-      console.debug("[location] Geolocation API not available");
       tryFallbacks("Geolocation is not supported by your browser.");
       return;
     }
 
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
-        console.debug("[location] GPS success:", pos.coords.latitude, pos.coords.longitude, "accuracy:", pos.coords.accuracy, "m");
+        console.debug("[location] GPS success:", pos.coords.latitude, pos.coords.longitude);
         finish();
         await resolveAndFetch(pos.coords.latitude, pos.coords.longitude, "gps");
       },
       (err) => {
-        console.warn("[location] GPS failed:", err.code, err.message);
         let reason = "Location access denied.";
         if (err.code === 3) reason = "Location request timed out.";
         else if (err.code === 2) reason = "Location unavailable.";
@@ -415,47 +384,33 @@ export const useWeather = () => {
     async function tryFallbacks(gpsReason: string) {
       const saved = loadSavedLocation();
       if (saved) {
-        console.debug("[location] Using saved location:", saved.city);
         finish();
         const reqId = startRequest();
-        // For saved locations, pass null geoResult and let weather API name compete with saved name
         await fetchWeatherByCoords(saved.lat, saved.lon, null, "saved", reqId);
         return;
       }
-
-      console.debug("[location] Trying IP fallback...");
       const ipLoc = await getIpLocation();
       if (ipLoc) {
         finish();
         await resolveAndFetch(ipLoc.lat, ipLoc.lon, "ip");
         return;
       }
-
       finish();
       setError(`${gpsReason} Please search for a city manually.`);
     }
   }, [resolveAndFetch, fetchWeatherByCoords]);
 
   const fetchSuggestions = useCallback(async (query: string) => {
-    if (query.trim().length < 2) {
-      setSuggestions([]);
-      return;
-    }
+    if (query.trim().length < 2) { setSuggestions([]); return; }
     try {
       const res = await fetch(
         `https://api.openweathermap.org/geo/1.0/direct?q=${encodeURIComponent(query)}&limit=5&appid=${API_KEY}`
       );
       if (res.ok) {
         const data = await res.json();
-        setSuggestions(
-          data.map((item: any) => ({
-            name: item.name,
-            country: item.country,
-            state: item.state,
-            lat: item.lat,
-            lon: item.lon,
-          }))
-        );
+        setSuggestions(data.map((item: any) => ({
+          name: item.name, country: item.country, state: item.state, lat: item.lat, lon: item.lon,
+        })));
       }
     } catch {}
   }, []);
@@ -467,7 +422,7 @@ export const useWeather = () => {
 
   return {
     city, setCity,
-    weather, forecast, loading, error, unit, setUnit,
+    weather, forecast, aqi, loading, error, unit, setUnit,
     toDisplay, fetchWeather, fetchByCoords,
     suggestions, setSuggestions, fetchSuggestions,
     locationSource, detectingLocation, detectLocation,

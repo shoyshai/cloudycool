@@ -1,25 +1,47 @@
-import { Droplets, Wind, Thermometer, CloudOff, LocateFixed, Info } from "lucide-react";
+import { Droplets, Wind, Thermometer, CloudOff, LocateFixed, Info, Sun, Moon, Leaf } from "lucide-react";
 import { useWeather } from "@/hooks/useWeather";
+import { useTheme } from "@/hooks/useTheme";
 import CitySearch from "@/components/CitySearch";
+import type { AqiData } from "@/hooks/useWeather";
+
+const AQI_COLORS: Record<number, string> = {
+  1: "var(--aqi-good)",
+  2: "var(--aqi-fair)",
+  3: "var(--aqi-moderate)",
+  4: "var(--aqi-poor)",
+  5: "var(--aqi-very-poor)",
+};
 
 const Index = () => {
   const {
-    city, setCity, weather, forecast, loading, error,
+    city, setCity, weather, forecast, aqi, loading, error,
     unit, setUnit, toDisplay,
     fetchWeather, fetchByCoords,
     suggestions, setSuggestions, fetchSuggestions,
     locationSource, detectingLocation, detectLocation,
   } = useWeather();
 
+  const { theme, toggleTheme } = useTheme();
+
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center px-4 py-12"
+    <div className="min-h-screen flex flex-col items-center justify-center px-4 py-12 transition-colors duration-300"
       style={{ background: "var(--gradient-sky)" }}>
       
       <div className="w-full max-w-md space-y-6">
         {/* Header */}
-        <div className="text-center space-y-2">
-          <h1 className="text-4xl font-bold text-primary-foreground tracking-tight">Weather App</h1>
-          <p className="text-primary-foreground/70 text-sm">Search any city to get current weather</p>
+        <div className="flex items-center justify-between">
+          <div className="space-y-1">
+            <h1 className="text-4xl font-bold text-primary-foreground tracking-tight">Weather App</h1>
+            <p className="text-primary-foreground/70 text-sm">Search any city to get current weather</p>
+          </div>
+          <button
+            onClick={toggleTheme}
+            className="p-2.5 rounded-lg bg-card/80 backdrop-blur-md text-card-foreground border border-border hover:bg-accent transition-colors"
+            title={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
+            style={{ boxShadow: "var(--shadow-card)" }}
+          >
+            {theme === "dark" ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+          </button>
         </div>
 
         {/* Search */}
@@ -98,6 +120,11 @@ const Index = () => {
           </div>
         )}
 
+        {/* AQI Card */}
+        {weather && (
+          <AqiCard aqi={aqi} />
+        )}
+
         {/* 5-Day Forecast */}
         {forecast.length > 0 && (
           <div className="rounded-xl bg-card/80 backdrop-blur-md overflow-hidden animate-fade-in-up" style={{ boxShadow: "var(--shadow-card)" }}>
@@ -123,6 +150,43 @@ const Index = () => {
     </div>
   );
 };
+
+const AqiCard = ({ aqi }: { aqi: AqiData | null }) => (
+  <div className="rounded-xl bg-card/80 backdrop-blur-md overflow-hidden animate-fade-in-up" style={{ boxShadow: "var(--shadow-card)" }}>
+    <div className="px-6 py-4 flex items-center justify-between">
+      <div className="flex items-center gap-3">
+        <Leaf className="w-5 h-5 text-muted-foreground" />
+        <div>
+          <h3 className="text-sm font-semibold text-card-foreground uppercase tracking-wide">Air Quality</h3>
+          {aqi ? (
+            <p className="text-xs text-muted-foreground mt-0.5">{aqi.hint}</p>
+          ) : (
+            <p className="text-xs text-muted-foreground mt-0.5">AQI data unavailable</p>
+          )}
+        </div>
+      </div>
+      {aqi && (
+        <div className="flex items-center gap-2">
+          <span
+            className="text-2xl font-bold"
+            style={{ color: `hsl(${AQI_COLORS[aqi.index]})` }}
+          >
+            {aqi.index}
+          </span>
+          <span
+            className="text-xs font-semibold px-2 py-1 rounded-full"
+            style={{
+              backgroundColor: `hsl(${AQI_COLORS[aqi.index]} / 0.15)`,
+              color: `hsl(${AQI_COLORS[aqi.index]})`,
+            }}
+          >
+            {aqi.label}
+          </span>
+        </div>
+      )}
+    </div>
+  </div>
+);
 
 const Stat = ({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) => (
   <div className="p-4 text-center space-y-1">
