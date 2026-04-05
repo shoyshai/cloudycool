@@ -323,6 +323,7 @@ export const useWeather = () => {
     const id = ++requestIdRef.current;
     setWeather(null);
     setForecast([]);
+    setHourly([]);
     setSuggestions([]);
     setAqi(null);
     return id;
