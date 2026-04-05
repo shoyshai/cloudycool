@@ -453,7 +453,7 @@ export const useWeather = () => {
 
   return {
     city, setCity,
-    weather, forecast, aqi, loading, error, unit, setUnit,
+    weather, forecast, hourly, aqi, loading, error, unit, setUnit,
     toDisplay, fetchWeather, fetchByCoords,
     suggestions, setSuggestions, fetchSuggestions,
     locationSource, detectingLocation, detectLocation,
