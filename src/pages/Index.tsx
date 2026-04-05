@@ -1,4 +1,4 @@
-import { Droplets, Wind, Thermometer, CloudOff } from "lucide-react";
+import { Droplets, Wind, Thermometer, CloudOff, LocateFixed, Info } from "lucide-react";
 import { useWeather } from "@/hooks/useWeather";
 import CitySearch from "@/components/CitySearch";
 
@@ -6,8 +6,9 @@ const Index = () => {
   const {
     city, setCity, weather, forecast, loading, error,
     unit, setUnit, toDisplay,
-    fetchWeather, fetchByLocation, fetchByCoords,
+    fetchWeather, fetchByCoords,
     suggestions, setSuggestions, fetchSuggestions,
+    locationSource, detectingLocation, detectLocation,
   } = useWeather();
 
   return (
@@ -28,7 +29,7 @@ const Index = () => {
           loading={loading}
           suggestions={suggestions}
           onSearch={fetchWeather}
-          onLocate={fetchByLocation}
+          onLocate={detectLocation}
           onSelectSuggestion={(s) => {
             setSuggestions([]);
             fetchByCoords(s.lat, s.lon);
@@ -36,8 +37,16 @@ const Index = () => {
           onQueryChange={fetchSuggestions}
         />
 
-        {/* Loading */}
-        {loading && (
+        {/* Detecting location */}
+        {detectingLocation && (
+          <div className="rounded-xl bg-card/80 backdrop-blur-md p-8 text-center" style={{ boxShadow: "var(--shadow-card)" }}>
+            <LocateFixed className="w-10 h-10 mx-auto text-primary animate-pulse" />
+            <p className="mt-4 text-muted-foreground text-sm">Detecting your location...</p>
+          </div>
+        )}
+
+        {/* Loading weather */}
+        {loading && !detectingLocation && (
           <div className="rounded-xl bg-card/80 backdrop-blur-md p-8 text-center" style={{ boxShadow: "var(--shadow-card)" }}>
             <div className="w-12 h-12 mx-auto rounded-full border-4 border-muted border-t-primary animate-spin" />
             <p className="mt-4 text-muted-foreground text-sm">Fetching weather data...</p>
@@ -45,10 +54,18 @@ const Index = () => {
         )}
 
         {/* Error */}
-        {error && (
+        {error && !detectingLocation && (
           <div className="rounded-xl bg-card/80 backdrop-blur-md p-8 text-center animate-fade-in-up" style={{ boxShadow: "var(--shadow-card)" }}>
             <CloudOff className="w-12 h-12 mx-auto text-destructive" />
             <p className="mt-3 text-destructive font-medium">{error}</p>
+          </div>
+        )}
+
+        {/* IP fallback note */}
+        {locationSource === "ip" && weather && (
+          <div className="flex items-center gap-2 rounded-lg bg-secondary/20 px-4 py-2 text-xs text-muted-foreground animate-fade-in-up">
+            <Info className="w-3.5 h-3.5 shrink-0" />
+            <span>Showing approximate location from network. Use the location button for better accuracy.</span>
           </div>
         )}
 
