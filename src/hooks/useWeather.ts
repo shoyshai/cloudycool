@@ -251,7 +251,7 @@ export const useWeather = () => {
   const [city, setCity] = useState("");
   const [weather, setWeather] = useState<WeatherData | null>(null);
   const [forecast, setForecast] = useState<ForecastDay[]>([]);
-  const [aqi, setAqi] = useState<AqiData | null>(null);
+  const [hourly, setHourly] = useState<HourlyForecast[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [unit, setUnit] = useState<"C" | "F">("C");
