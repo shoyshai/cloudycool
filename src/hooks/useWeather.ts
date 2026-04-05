@@ -20,6 +20,13 @@ export interface ForecastDay {
   icon: string;
 }
 
+export interface HourlyForecast {
+  time: string;
+  temp: number;
+  condition: string;
+  icon: string;
+}
+
 export interface CitySuggestion {
   name: string;
   country: string;
@@ -197,6 +204,21 @@ const getIpLocation = async (): Promise<{ lat: number; lon: number; city: string
   } catch { return null; }
 };
 
+// ── Hourly forecast parser ─────────────────────────────────────────
+const parseHourlyForToday = (list: any[]): HourlyForecast[] => {
+  const today = new Date().toISOString().split("T")[0];
+  const entries = list
+    .filter((item) => item.dt_txt.startsWith(today))
+    .map((item) => ({
+      time: new Date(item.dt_txt).toLocaleTimeString("en-US", { hour: "numeric", hour12: true }),
+      temp: Math.round(item.main.temp),
+      condition: item.weather[0].description,
+      icon: item.weather[0].icon,
+    }));
+  console.debug(`[hourly] Parsed ${entries.length} entries for today (${today})`);
+  return entries;
+};
+
 // ── Forecast parser ────────────────────────────────────────────────
 const parseForecast = (list: any[]): ForecastDay[] => {
   const days: Record<string, any[]> = {};
@@ -229,6 +251,7 @@ export const useWeather = () => {
   const [city, setCity] = useState("");
   const [weather, setWeather] = useState<WeatherData | null>(null);
   const [forecast, setForecast] = useState<ForecastDay[]>([]);
+  const [hourly, setHourly] = useState<HourlyForecast[]>([]);
   const [aqi, setAqi] = useState<AqiData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -276,12 +299,16 @@ export const useWeather = () => {
         humidity: data.main.humidity, windSpeed: data.wind.speed, icon: data.weather[0].icon,
       });
       setForecast([]);
+      setHourly([]);
       setAqi(aqiResult);
       if (!aqiResult) console.debug("[aqi] AQI unavailable for this location");
 
       if (forecastRes.ok) {
         const fData = await forecastRes.json();
-        if (reqId === requestIdRef.current) setForecast(parseForecast(fData.list));
+        if (reqId === requestIdRef.current) {
+          setForecast(parseForecast(fData.list));
+          setHourly(parseHourlyForToday(fData.list));
+        }
       }
 
       saveLocation({ lat, lon, city: displayCity, state: geoResult?.state });
@@ -296,6 +323,7 @@ export const useWeather = () => {
     const id = ++requestIdRef.current;
     setWeather(null);
     setForecast([]);
+    setHourly([]);
     setSuggestions([]);
     setAqi(null);
     return id;
@@ -336,7 +364,10 @@ export const useWeather = () => {
       setAqi(aqiResult);
       if (forecastRes.ok) {
         const fData = await forecastRes.json();
-        if (reqId === requestIdRef.current) setForecast(parseForecast(fData.list));
+        if (reqId === requestIdRef.current) {
+          setForecast(parseForecast(fData.list));
+          setHourly(parseHourlyForToday(fData.list));
+        }
       }
       saveLocation({ lat: data.coord.lat, lon: data.coord.lon, city: data.name });
     } catch {
@@ -422,7 +453,7 @@ export const useWeather = () => {
 
   return {
     city, setCity,
-    weather, forecast, aqi, loading, error, unit, setUnit,
+    weather, forecast, hourly, aqi, loading, error, unit, setUnit,
     toDisplay, fetchWeather, fetchByCoords,
     suggestions, setSuggestions, fetchSuggestions,
     locationSource, detectingLocation, detectLocation,
