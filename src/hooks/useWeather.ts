@@ -298,12 +298,16 @@ export const useWeather = () => {
         humidity: data.main.humidity, windSpeed: data.wind.speed, icon: data.weather[0].icon,
       });
       setForecast([]);
+      setHourly([]);
       setAqi(aqiResult);
       if (!aqiResult) console.debug("[aqi] AQI unavailable for this location");
 
       if (forecastRes.ok) {
         const fData = await forecastRes.json();
-        if (reqId === requestIdRef.current) setForecast(parseForecast(fData.list));
+        if (reqId === requestIdRef.current) {
+          setForecast(parseForecast(fData.list));
+          setHourly(parseHourlyForToday(fData.list));
+        }
       }
 
       saveLocation({ lat, lon, city: displayCity, state: geoResult?.state });
