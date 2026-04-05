@@ -1,8 +1,10 @@
-import { Droplets, Wind, Thermometer, CloudOff, LocateFixed, Info, Sun, Moon, Leaf } from "lucide-react";
+import { Droplets, Wind, Thermometer, CloudOff, LocateFixed, Info, Sun, Moon, Leaf, Clock } from "lucide-react";
 import { useWeather } from "@/hooks/useWeather";
 import { useTheme } from "@/hooks/useTheme";
+import { getWeatherBackground } from "@/lib/weatherBackgrounds";
 import CitySearch from "@/components/CitySearch";
-import type { AqiData } from "@/hooks/useWeather";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import type { AqiData, HourlyForecast } from "@/hooks/useWeather";
 
 const AQI_COLORS: Record<number, string> = {
   1: "var(--aqi-good)",
@@ -14,7 +16,7 @@ const AQI_COLORS: Record<number, string> = {
 
 const Index = () => {
   const {
-    city, setCity, weather, forecast, aqi, loading, error,
+    city, setCity, weather, forecast, hourly, aqi, loading, error,
     unit, setUnit, toDisplay,
     fetchWeather, fetchByCoords,
     suggestions, setSuggestions, fetchSuggestions,
@@ -23,10 +25,13 @@ const Index = () => {
 
   const { theme, toggleTheme } = useTheme();
 
+  const bg = getWeatherBackground(weather?.condition, weather?.icon, theme);
+
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center px-4 py-12 transition-colors duration-300"
-      style={{ background: "var(--gradient-sky)" }}>
-      
+    <div
+      className="min-h-screen flex flex-col items-center justify-center px-4 py-12 transition-all duration-700"
+      style={{ background: bg.gradient }}
+    >
       <div className="w-full max-w-md space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -120,10 +125,26 @@ const Index = () => {
           </div>
         )}
 
-        {/* AQI Card */}
-        {weather && (
-          <AqiCard aqi={aqi} />
+        {/* Hourly Forecast */}
+        {hourly.length > 0 && (
+          <div className="rounded-xl bg-card/80 backdrop-blur-md overflow-hidden animate-fade-in-up" style={{ boxShadow: "var(--shadow-card)" }}>
+            <div className="px-6 py-4 border-b border-border flex items-center gap-2">
+              <Clock className="w-4 h-4 text-muted-foreground" />
+              <h3 className="text-sm font-semibold text-card-foreground uppercase tracking-wide">Today's Forecast</h3>
+            </div>
+            <ScrollArea className="w-full">
+              <div className="flex gap-2 px-4 py-4">
+                {hourly.map((h, i) => (
+                  <HourlyCard key={i} item={h} toDisplay={toDisplay} />
+                ))}
+              </div>
+              <ScrollBar orientation="horizontal" />
+            </ScrollArea>
+          </div>
         )}
+
+        {/* AQI Card */}
+        {weather && <AqiCard aqi={aqi} />}
 
         {/* 5-Day Forecast */}
         {forecast.length > 0 && (
@@ -151,6 +172,15 @@ const Index = () => {
   );
 };
 
+const HourlyCard = ({ item, toDisplay }: { item: HourlyForecast; toDisplay: (c: number) => number }) => (
+  <div className="flex flex-col items-center gap-1 min-w-[72px] rounded-lg bg-muted/50 px-3 py-3">
+    <span className="text-xs font-medium text-muted-foreground">{item.time}</span>
+    <img src={`https://openweathermap.org/img/wn/${item.icon}.png`} alt={item.condition} className="w-8 h-8" />
+    <span className="text-sm font-semibold text-card-foreground">{toDisplay(item.temp)}°</span>
+    <span className="text-[10px] text-muted-foreground capitalize truncate max-w-[64px]">{item.condition}</span>
+  </div>
+);
+
 const AqiCard = ({ aqi }: { aqi: AqiData | null }) => (
   <div className="rounded-xl bg-card/80 backdrop-blur-md overflow-hidden animate-fade-in-up" style={{ boxShadow: "var(--shadow-card)" }}>
     <div className="px-6 py-4 flex items-center justify-between">
@@ -167,10 +197,7 @@ const AqiCard = ({ aqi }: { aqi: AqiData | null }) => (
       </div>
       {aqi && (
         <div className="flex items-center gap-2">
-          <span
-            className="text-2xl font-bold"
-            style={{ color: `hsl(${AQI_COLORS[aqi.index]})` }}
-          >
+          <span className="text-2xl font-bold" style={{ color: `hsl(${AQI_COLORS[aqi.index]})` }}>
             {aqi.index}
           </span>
           <span
