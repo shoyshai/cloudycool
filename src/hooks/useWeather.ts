@@ -20,6 +20,13 @@ export interface ForecastDay {
   icon: string;
 }
 
+export interface HourlyForecast {
+  time: string;
+  temp: number;
+  condition: string;
+  icon: string;
+}
+
 export interface CitySuggestion {
   name: string;
   country: string;
