@@ -39,6 +39,12 @@
     --shadow-card: 0 8px 32px -8px hsl(205 85% 55% / 0.15);
     --shadow-elevated: 0 20px 60px -15px hsl(205 85% 55% / 0.25);
 
+    --aqi-good: 142 71% 45%;
+    --aqi-fair: 48 96% 53%;
+    --aqi-moderate: 25 95% 53%;
+    --aqi-poor: 0 84% 60%;
+    --aqi-very-poor: 0 72% 45%;
+
     --sidebar-background: 0 0% 98%;
     --sidebar-foreground: 240 5.3% 26.1%;
     --sidebar-primary: 240 5.9% 10%;
@@ -69,6 +75,17 @@
     --border: 215 20% 20%;
     --input: 215 20% 20%;
     --ring: 205 85% 55%;
+
+    --gradient-sky: linear-gradient(135deg, hsl(215 30% 12%), hsl(210 25% 16%), hsl(220 20% 14%));
+    --shadow-card: 0 8px 32px -8px hsl(0 0% 0% / 0.3);
+    --shadow-elevated: 0 20px 60px -15px hsl(0 0% 0% / 0.4);
+
+    --aqi-good: 142 71% 40%;
+    --aqi-fair: 48 90% 45%;
+    --aqi-moderate: 25 90% 45%;
+    --aqi-poor: 0 80% 50%;
+    --aqi-very-poor: 0 65% 40%;
+
     --sidebar-background: 240 5.9% 10%;
     --sidebar-foreground: 240 4.8% 95.9%;
     --sidebar-primary: 224.3 76.3% 48%;
