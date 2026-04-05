@@ -364,7 +364,10 @@ export const useWeather = () => {
       setAqi(aqiResult);
       if (forecastRes.ok) {
         const fData = await forecastRes.json();
-        if (reqId === requestIdRef.current) setForecast(parseForecast(fData.list));
+        if (reqId === requestIdRef.current) {
+          setForecast(parseForecast(fData.list));
+          setHourly(parseHourlyForToday(fData.list));
+        }
       }
       saveLocation({ lat: data.coord.lat, lon: data.coord.lon, city: data.name });
     } catch {
