@@ -48,7 +48,7 @@ const Index = () => {
 
       <main className={`${frameClass} relative z-10 flex flex-col gap-4`}>
         <div className="rounded-[2rem] border border-white/25 bg-slate-900/20 p-2 shadow-[0_35px_90px_-50px_rgba(15,23,42,0.95)] backdrop-blur-xl">
-          <section className={`${glassCardClass} p-5`}>
+          <section className={`${glassCardClass} relative z-[90] overflow-visible p-5`}>
             <div className="flex items-start justify-between gap-4">
               <div className="min-w-0">
                 <p className="text-[11px] uppercase tracking-[0.24em] text-white/70">CloudyCool</p>
