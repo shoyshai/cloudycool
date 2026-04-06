@@ -47,8 +47,8 @@ const CitySearch = ({
   };
 
   return (
-    <div className="flex flex-col gap-3 sm:flex-row" ref={wrapperRef}>
-      <div className="relative flex-1 min-w-0">
+    <div className="mx-auto flex w-full max-w-[360px] items-center gap-2.5" ref={wrapperRef}>
+      <div className="relative min-w-0 flex-1">
         <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/70" />
         <input
           type="text"
@@ -84,7 +84,7 @@ const CitySearch = ({
       <button
         onClick={() => { setShowSuggestions(false); onSearch(); }}
         disabled={loading}
-        className="h-12 rounded-2xl bg-white/90 px-5 text-sm font-semibold text-sky-900 transition hover:bg-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-[0_14px_34px_-22px_rgba(15,23,42,0.85)]"
+        className="h-12 min-w-[90px] rounded-2xl bg-white/90 px-4 text-sm font-semibold text-sky-900 transition hover:bg-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-[0_14px_34px_-22px_rgba(15,23,42,0.85)]"
       >
         <Search className="w-4 h-4" />
         <span>Search</span>
