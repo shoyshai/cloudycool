@@ -129,3 +129,29 @@
 .animate-pulse-gentle {
   animation: pulse-gentle 1.5s ease-in-out infinite;
 }
+
+@keyframes float-soft {
+  0%, 100% {
+    transform: translate3d(0, 0, 0);
+  }
+  50% {
+    transform: translate3d(0, -16px, 0);
+  }
+}
+
+@keyframes float-soft-delayed {
+  0%, 100% {
+    transform: translate3d(0, 0, 0);
+  }
+  50% {
+    transform: translate3d(-8px, 14px, 0);
+  }
+}
+
+.animate-float-soft {
+  animation: float-soft 8s ease-in-out infinite;
+}
+
+.animate-float-soft-delayed {
+  animation: float-soft-delayed 11s ease-in-out infinite;
+}
