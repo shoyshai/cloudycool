@@ -1,7 +1,8 @@
-﻿import { Droplets, Wind, Thermometer, CloudOff, LocateFixed, Info, Sun, Moon, Leaf, Clock, CalendarDays } from "lucide-react";
+﻿import { Droplets, Wind, Thermometer, CloudOff, LocateFixed, Info, Sun, Moon, Leaf, Clock, CalendarDays, Download } from "lucide-react";
 import { useWeather } from "@/hooks/useWeather";
 import { useTheme } from "@/hooks/useTheme";
 import { getWeatherBackground } from "@/lib/weatherBackgrounds";
+import { usePwaInstall } from "@/hooks/usePwaInstall";
 import CitySearch from "@/components/CitySearch";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import type { AqiData, HourlyForecast } from "@/hooks/useWeather";
@@ -30,6 +31,7 @@ const Index = () => {
   } = useWeather();
 
   const { theme, toggleTheme } = useTheme();
+  const { canInstall, showIosHint, promptInstall } = usePwaInstall();
 
   const bg = getWeatherBackground(weather?.condition, weather?.icon, theme);
   const aqiTone = aqi ? `hsl(${AQI_COLORS[aqi.index]})` : "rgba(255,255,255,0.8)";
@@ -53,13 +55,25 @@ const Index = () => {
                 <h1 className="mt-2 text-xl font-semibold text-white">Weather Intelligence</h1>
                 <p className="mt-1 text-xs text-white/75">Live weather with hourly and air quality insights</p>
               </div>
-              <button
-                onClick={toggleTheme}
-                className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl border border-white/30 bg-white/20 text-white backdrop-blur-xl transition hover:bg-white/30"
-                title={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
-              >
-                {theme === "dark" ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
-              </button>
+              <div className="flex items-center gap-2">
+                {canInstall && (
+                  <button
+                    onClick={promptInstall}
+                    className="flex h-10 items-center gap-1.5 rounded-2xl border border-white/30 bg-white/20 px-3 text-xs font-semibold text-white backdrop-blur-xl transition hover:bg-white/30"
+                    title="Install CloudyCool"
+                  >
+                    <Download className="h-4 w-4" />
+                    <span>Install</span>
+                  </button>
+                )}
+                <button
+                  onClick={toggleTheme}
+                  className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl border border-white/30 bg-white/20 text-white backdrop-blur-xl transition hover:bg-white/30"
+                  title={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
+                >
+                  {theme === "dark" ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+                </button>
+              </div>
             </div>
 
             <div className="mt-4">
@@ -77,6 +91,11 @@ const Index = () => {
                 onQueryChange={fetchSuggestions}
               />
             </div>
+            {showIosHint && (
+              <p className="mt-3 text-[11px] text-white/72">
+                On iPhone, tap Share and choose Add to Home Screen.
+              </p>
+            )}
           </section>
 
           {detectingLocation && (
