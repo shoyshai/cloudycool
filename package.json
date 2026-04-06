@@ -11,6 +11,7 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
+    "predeploy": "npm run build && powershell -Command \"Copy-Item dist/index.html dist/404.html -Force\"",
     "deploy": "gh-pages -d dist"
   },
   "dependencies": {
