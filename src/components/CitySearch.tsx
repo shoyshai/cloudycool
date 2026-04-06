@@ -47,8 +47,9 @@ const CitySearch = ({
   };
 
   return (
-    <div className="mx-auto flex w-full max-w-[360px] items-center gap-2.5" ref={wrapperRef}>
-      <div className="relative min-w-0 flex-1">
+    <div className="relative z-[60] mx-auto w-full max-w-[360px]" ref={wrapperRef}>
+      <div className="flex items-center gap-2.5">
+        <div className="relative min-w-0 flex-1">
         <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/70" />
         <input
           type="text"
@@ -64,39 +65,41 @@ const CitySearch = ({
           onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
           className="w-full h-12 pl-11 pr-4 rounded-2xl border border-white/30 bg-white/20 text-white placeholder:text-white/65 shadow-[0_14px_40px_-26px_rgba(15,23,42,0.9)] backdrop-blur-xl focus:outline-none focus:ring-2 focus:ring-white/40 focus:bg-white/25 transition"
         />
-        {showSuggestions && suggestions.length > 0 && (
-          <ul className="absolute z-50 top-full left-0 right-0 mt-2 overflow-hidden rounded-2xl border border-white/25 bg-slate-900/80 shadow-[0_22px_48px_-20px_rgba(15,23,42,0.95)] backdrop-blur-2xl">
-            {suggestions.map((s, i) => (
-              <li
-                key={`${s.lat}-${s.lon}-${i}`}
-                onClick={() => handleSelect(s)}
-                className="flex cursor-pointer items-center gap-2 px-4 py-3 text-sm text-white/95 transition-colors hover:bg-white/10"
-              >
-                <MapPin className="w-3.5 h-3.5 text-white/70 shrink-0" />
-                <span className="font-medium">{s.name}</span>
-                {s.state && <span className="text-white/70">{s.state},</span>}
-                <span className="text-white/70">{s.country}</span>
-              </li>
-            ))}
-          </ul>
-        )}
+        </div>
+        <button
+          onClick={() => { setShowSuggestions(false); onSearch(); }}
+          disabled={loading}
+          className="h-12 min-w-[90px] rounded-2xl bg-white/90 px-4 text-sm font-semibold text-sky-900 transition hover:bg-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-[0_14px_34px_-22px_rgba(15,23,42,0.85)]"
+        >
+          <Search className="w-4 h-4" />
+          <span>Search</span>
+        </button>
+        <button
+          onClick={onLocate}
+          disabled={loading}
+          className="h-12 w-12 shrink-0 rounded-2xl border border-white/30 bg-white/20 text-white backdrop-blur-xl transition hover:bg-white/30 disabled:opacity-50 disabled:cursor-not-allowed grid place-items-center shadow-[0_14px_34px_-22px_rgba(15,23,42,0.85)]"
+          title="Use my location"
+        >
+          <LocateFixed className="w-4 h-4" />
+        </button>
       </div>
-      <button
-        onClick={() => { setShowSuggestions(false); onSearch(); }}
-        disabled={loading}
-        className="h-12 min-w-[90px] rounded-2xl bg-white/90 px-4 text-sm font-semibold text-sky-900 transition hover:bg-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-[0_14px_34px_-22px_rgba(15,23,42,0.85)]"
-      >
-        <Search className="w-4 h-4" />
-        <span>Search</span>
-      </button>
-      <button
-        onClick={onLocate}
-        disabled={loading}
-        className="h-12 w-12 shrink-0 rounded-2xl border border-white/30 bg-white/20 text-white backdrop-blur-xl transition hover:bg-white/30 disabled:opacity-50 disabled:cursor-not-allowed grid place-items-center shadow-[0_14px_34px_-22px_rgba(15,23,42,0.85)]"
-        title="Use my location"
-      >
-        <LocateFixed className="w-4 h-4" />
-      </button>
+
+      {showSuggestions && suggestions.length > 0 && (
+        <ul className="absolute left-0 right-0 top-full mt-2 z-[70] max-h-60 overflow-y-auto overscroll-contain rounded-2xl border border-white/35 bg-slate-950/85 shadow-[0_28px_58px_-24px_rgba(15,23,42,0.95)] backdrop-blur-2xl">
+          {suggestions.map((s, i) => (
+            <li
+              key={`${s.lat}-${s.lon}-${i}`}
+              onClick={() => handleSelect(s)}
+              className="flex cursor-pointer items-center gap-2 border-b border-white/10 px-4 py-3 text-sm text-white/95 transition-colors hover:bg-white/12 last:border-b-0"
+            >
+              <MapPin className="w-3.5 h-3.5 text-white/70 shrink-0" />
+              <span className="font-medium">{s.name}</span>
+              {s.state && <span className="text-white/70">{s.state},</span>}
+              <span className="text-white/70">{s.country}</span>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 };
