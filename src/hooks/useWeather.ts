@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 export interface WeatherData {
   city: string;
   country: string;
+  state?: string;
   lat: number;
   lon: number;
   temp: number;
@@ -11,6 +12,8 @@ export interface WeatherData {
   humidity: number;
   windSpeed: number;
   icon: string;
+  sunrise: number;
+  sunset: number;
 }
 
 export interface ForecastDay {
@@ -43,11 +46,12 @@ export interface AqiData {
   hint: string;
 }
 
-export type LocationSource = "gps" | "saved" | "ip" | "manual" | null;
+export type LocationSource = "gps" | "saved" | "ip" | "manual" | "offline" | null;
 
 // ── Constants ──────────────────────────────────────────────────────
 const API_KEY = "b1b15e88fa797225412429c1c50c122a1";
 const STORAGE_KEY = "cloudycool_last_location";
+const OFFLINE_CACHE_KEY = "cloudycool_offline_cache";
 const SAVED_MAX_AGE_MS = 30 * 60 * 1000;
 const REVERSE_GEO_TIMEOUT_MS = 5000;
 
@@ -171,6 +175,28 @@ const loadSavedLocation = (): SavedLocation | null => {
   } catch { return null; }
 };
 
+interface OfflineCache {
+  weather: WeatherData;
+  forecast: ForecastDay[];
+  hourly: HourlyForecast[];
+  aqi: AqiData | null;
+  ts: number;
+}
+
+const saveOfflineCache = (data: Omit<OfflineCache, "ts">) => {
+  try {
+    localStorage.setItem(OFFLINE_CACHE_KEY, JSON.stringify({ ...data, ts: Date.now() }));
+  } catch {}
+};
+
+const loadOfflineCache = (): OfflineCache | null => {
+  try {
+    const raw = localStorage.getItem(OFFLINE_CACHE_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch { return null; }
+}
+
 // ── Reverse geocoding ──────────────────────────────────────────────
 interface ReverseGeoResult { addr: Record<string, string>; state?: string; country?: string; }
 
@@ -207,17 +233,15 @@ const getIpLocation = async (): Promise<{ lat: number; lon: number; city: string
 };
 
 // ── Hourly forecast parser ─────────────────────────────────────────
-const parseHourlyForToday = (list: any[]): HourlyForecast[] => {
-  const today = new Date().toISOString().split("T")[0];
-  const entries = list
-    .filter((item) => item.dt_txt.startsWith(today))
-    .map((item) => ({
-      time: new Date(item.dt_txt).toLocaleTimeString("en-US", { hour: "numeric", hour12: true }),
-      temp: Math.round(item.main.temp),
-      condition: item.weather[0].description,
-      icon: item.weather[0].icon,
-    }));
-  console.debug(`[hourly] Parsed ${entries.length} entries for today (${today})`);
+const parseHourlyForNext24h = (list: any[]): HourlyForecast[] => {
+  // Grab the next 8 items (8 * 3 hours = 24 hours of forecast)
+  const entries = list.slice(0, 8).map((item) => ({
+    time: new Date(item.dt_txt).toLocaleTimeString("en-US", { hour: "numeric", hour12: true }),
+    temp: Math.round(item.main.temp),
+    condition: item.weather[0].description,
+    icon: item.weather[0].icon,
+  }));
+  console.debug(`[hourly] Parsed ${entries.length} entries for upcoming 24h`);
   return entries;
 };
 
@@ -261,10 +285,38 @@ export const useWeather = () => {
   const [suggestions, setSuggestions] = useState<CitySuggestion[]>([]);
   const [locationSource, setLocationSource] = useState<LocationSource>(null);
   const [detectingLocation, setDetectingLocation] = useState(false);
+  const [isOffline, setIsOffline] = useState(!navigator.onLine);
 
   const requestIdRef = useRef(0);
 
   const toDisplay = (c: number) => unit === "F" ? Math.round(c * 9 / 5 + 32) : c;
+
+  useEffect(() => {
+    const handleOnline = () => setIsOffline(false);
+    const handleOffline = () => setIsOffline(true);
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    };
+  }, []);
+
+  const loadFromCacheOrError = (reason: string, reqId: number) => {
+    if (reqId !== requestIdRef.current) return;
+    const cached = loadOfflineCache();
+    if (cached) {
+      setWeather(cached.weather);
+      setForecast(cached.forecast);
+      setHourly(cached.hourly);
+      setAqi(cached.aqi);
+      setCity(cached.weather.city);
+      setLocationSource("offline");
+      setError(reason);
+    } else {
+      setError(reason);
+    }
+  };
 
   /** Core weather + AQI fetch — always by coordinates */
   const fetchWeatherByCoords = useCallback(async (
@@ -272,6 +324,12 @@ export const useWeather = () => {
   ) => {
     setLoading(true);
     setError("");
+
+    if (!navigator.onLine) {
+      loadFromCacheOrError("You are currently offline. Showing last known weather data.", reqId);
+      setLoading(false);
+      return;
+    }
 
     try {
       const params = `lat=${lat}&lon=${lon}`;
@@ -284,7 +342,7 @@ export const useWeather = () => {
 
       if (reqId !== requestIdRef.current) return;
 
-      if (!currentRes.ok) throw new Error("Weather data not available");
+      if (!currentRes.ok) throw new Error("City not found or service unavailable.");
       const data = await currentRes.json();
 
       const { label: displayCity } = resolveBestLocationLabel(
@@ -293,30 +351,37 @@ export const useWeather = () => {
 
       console.debug(`[location] Final: "${displayCity}" (source: ${source}, reqId: ${reqId})`);
 
-      setCity(displayCity);
-      setLocationSource(source);
-      setWeather({
-        city: displayCity, country: data.sys.country,
+      const newWeather: WeatherData = {
+        city: displayCity, country: data.sys.country, state: geoResult?.state,
         lat, lon,
+        sunrise: data.sys.sunrise, sunset: data.sys.sunset,
         temp: Math.round(data.main.temp), condition: data.weather[0].description,
         humidity: data.main.humidity, windSpeed: data.wind.speed, icon: data.weather[0].icon,
-      });
-      setForecast([]);
-      setHourly([]);
+      };
+
+      setCity(displayCity);
+      setLocationSource(source);
+      setWeather(newWeather);
       setAqi(aqiResult);
       if (!aqiResult) console.debug("[aqi] AQI unavailable for this location");
+
+      let newForecast: ForecastDay[] = [];
+      let newHourly: HourlyForecast[] = [];
 
       if (forecastRes.ok) {
         const fData = await forecastRes.json();
         if (reqId === requestIdRef.current) {
-          setForecast(parseForecast(fData.list));
-          setHourly(parseHourlyForToday(fData.list));
+          newForecast = parseForecast(fData.list);
+          newHourly = parseHourlyForNext24h(fData.list);
+          setForecast(newForecast);
+          setHourly(newHourly);
         }
       }
 
       saveLocation({ lat, lon, city: displayCity, state: geoResult?.state });
+      saveOfflineCache({ weather: newWeather, forecast: newForecast, hourly: newHourly, aqi: aqiResult });
     } catch {
-      if (reqId === requestIdRef.current) setError("Could not fetch weather data. Please try again.");
+      loadFromCacheOrError("Could not fetch weather data. The network might be unstable.", reqId);
     } finally {
       if (reqId === requestIdRef.current) setLoading(false);
     }
@@ -324,16 +389,22 @@ export const useWeather = () => {
 
   const startRequest = () => {
     const id = ++requestIdRef.current;
-    setWeather(null);
-    setForecast([]);
-    setHourly([]);
+    if (navigator.onLine) {
+      setWeather(null);
+      setForecast([]);
+      setHourly([]);
+      setAqi(null);
+    }
     setSuggestions([]);
-    setAqi(null);
     return id;
   };
 
   const resolveAndFetch = useCallback(async (lat: number, lon: number, source: LocationSource) => {
     const reqId = startRequest();
+    if (!navigator.onLine) {
+      loadFromCacheOrError("You are currently offline. Showing last known weather data.", reqId);
+      return;
+    }
     const geoResult = await reverseGeocode(lat, lon);
     if (reqId !== requestIdRef.current) return;
     await fetchWeatherByCoords(lat, lon, geoResult, source, reqId);
@@ -343,6 +414,13 @@ export const useWeather = () => {
     const reqId = startRequest();
     setLoading(true);
     setError("");
+
+    if (!navigator.onLine) {
+      loadFromCacheOrError("You are currently offline. Showing last known weather data.", reqId);
+      setLoading(false);
+      return;
+    }
+
     try {
       const params = `q=${encodeURIComponent(query)}`;
       const [currentRes, forecastRes] = await Promise.all([
@@ -350,32 +428,42 @@ export const useWeather = () => {
         fetch(`https://api.openweathermap.org/data/2.5/forecast?${params}&units=metric&appid=${API_KEY}`),
       ]);
       if (reqId !== requestIdRef.current) return;
-      if (!currentRes.ok) throw new Error("City not found");
+      if (!currentRes.ok) throw new Error("City not found.");
       const data = await currentRes.json();
 
       // Also fetch AQI for the searched city's coords
       const aqiResult = await fetchAQIByCoords(data.coord.lat, data.coord.lon).catch(() => null);
       if (reqId !== requestIdRef.current) return;
 
-      setCity(data.name);
-      setLocationSource("manual");
-      setWeather({
-        city: data.name, country: data.sys.country,
+      const newWeather: WeatherData = {
+        city: data.name, country: data.sys.country, state: undefined,
         lat: data.coord.lat, lon: data.coord.lon,
+        sunrise: data.sys.sunrise, sunset: data.sys.sunset,
         temp: Math.round(data.main.temp), condition: data.weather[0].description,
         humidity: data.main.humidity, windSpeed: data.wind.speed, icon: data.weather[0].icon,
-      });
+      };
+
+      setCity(data.name);
+      setLocationSource("manual");
+      setWeather(newWeather);
       setAqi(aqiResult);
+
+      let newForecast: ForecastDay[] = [];
+      let newHourly: HourlyForecast[] = [];
+
       if (forecastRes.ok) {
         const fData = await forecastRes.json();
         if (reqId === requestIdRef.current) {
-          setForecast(parseForecast(fData.list));
-          setHourly(parseHourlyForToday(fData.list));
+          newForecast = parseForecast(fData.list);
+          newHourly = parseHourlyForNext24h(fData.list);
+          setForecast(newForecast);
+          setHourly(newHourly);
         }
       }
       saveLocation({ lat: data.coord.lat, lon: data.coord.lon, city: data.name });
+      saveOfflineCache({ weather: newWeather, forecast: newForecast, hourly: newHourly, aqi: aqiResult });
     } catch {
-      if (reqId === requestIdRef.current) setError("Could not find that city. Please try again.");
+      loadFromCacheOrError("Could not find that city. Please try checking your spelling.", reqId);
     } finally {
       if (reqId === requestIdRef.current) setLoading(false);
     }
@@ -396,6 +484,13 @@ export const useWeather = () => {
 
     const finish = () => setDetectingLocation(false);
 
+    if (!navigator.onLine) {
+      finish();
+      const reqId = startRequest();
+      loadFromCacheOrError("You are currently offline. Showing last known weather data.", reqId);
+      return;
+    }
+
     if (!navigator.geolocation) {
       tryFallbacks("Geolocation is not supported by your browser.");
       return;
@@ -408,7 +503,7 @@ export const useWeather = () => {
         await resolveAndFetch(pos.coords.latitude, pos.coords.longitude, "gps");
       },
       (err) => {
-        let reason = "Location access denied.";
+        let reason = "Location permission denied.";
         if (err.code === 3) reason = "Location request timed out.";
         else if (err.code === 2) reason = "Location unavailable.";
         tryFallbacks(reason);
@@ -431,12 +526,13 @@ export const useWeather = () => {
         return;
       }
       finish();
-      setError(`${gpsReason} Please search for a city manually.`);
+      const reqId = startRequest();
+      loadFromCacheOrError(`${gpsReason} Please search for a city manually.`, reqId);
     }
   }, [resolveAndFetch, fetchWeatherByCoords]);
 
   const fetchSuggestions = useCallback(async (query: string) => {
-    if (query.trim().length < 2) { setSuggestions([]); return; }
+    if (!navigator.onLine || query.trim().length < 2) { setSuggestions([]); return; }
     try {
       const res = await fetch(
         `https://api.openweathermap.org/geo/1.0/direct?q=${encodeURIComponent(query)}&limit=5&appid=${API_KEY}`
@@ -460,6 +556,6 @@ export const useWeather = () => {
     weather, forecast, hourly, aqi, loading, error, unit, setUnit,
     toDisplay, fetchWeather, fetchByCoords,
     suggestions, setSuggestions, fetchSuggestions,
-    locationSource, detectingLocation, detectLocation,
+    locationSource, detectingLocation, detectLocation, isOffline,
   };
 };

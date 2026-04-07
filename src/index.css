@@ -155,3 +155,46 @@
 .animate-float-soft-delayed {
   animation: float-soft-delayed 11s ease-in-out infinite;
 }
+
+@keyframes rain {
+  0% { transform: translateY(-20vh) rotate(15deg); opacity: 0; }
+  10% { opacity: 1; }
+  90% { opacity: 1; }
+  100% { transform: translateY(120vh) rotate(15deg); opacity: 0; }
+}
+.animate-rain {
+  animation: rain linear infinite;
+}
+
+@keyframes snow {
+  0% { transform: translate3d(0, -10vh, 0); opacity: 0; }
+  10% { opacity: 1; }
+  100% { transform: translate3d(20px, 120vh, 0); opacity: 0; }
+}
+.animate-snow {
+  animation: snow linear infinite;
+}
+
+@keyframes pulse-soft {
+  0%, 100% { opacity: 0.2; transform: scale(0.9); }
+  50% { opacity: 0.8; transform: scale(1.1); }
+}
+.animate-pulse-soft {
+  animation: pulse-soft 4s ease-in-out infinite;
+}
+
+@keyframes cloud-drift-1 {
+  0%, 100% { transform: translateX(0); }
+  50% { transform: translateX(10vw); }
+}
+.animate-cloud-drift-1 {
+  animation: cloud-drift-1 20s ease-in-out infinite;
+}
+
+@keyframes cloud-drift-2 {
+  0%, 100% { transform: translateX(0); }
+  50% { transform: translateX(-8vw); }
+}
+.animate-cloud-drift-2 {
+  animation: cloud-drift-2 25s ease-in-out infinite;
+}

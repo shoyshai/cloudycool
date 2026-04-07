@@ -4,6 +4,7 @@ import { WeatherData } from "./useWeather";
 export interface FavoriteCity {
   city: string;
   country: string;
+  state?: string;
   lat: number;
   lon: number;
 }
@@ -47,11 +48,11 @@ export const useFavorites = () => {
     if (favorites.length >= MAX_FAVORITES) {
       console.warn(`Cannot add more than ${MAX_FAVORITES} favorites`);
       // Optionally could remove oldest or show user feedback. We'll simply let it fail silently or remove oldest:
-      const newFavs = [...favorites.slice(1), { city: weather.city, country: weather.country, lat: weather.lat, lon: weather.lon }];
+      const newFavs = [...favorites.slice(1), { city: weather.city, country: weather.country, state: weather.state, lat: weather.lat, lon: weather.lon }];
       saveFavorites(newFavs);
       return;
     }
-    const newFavs = [...favorites, { city: weather.city, country: weather.country, lat: weather.lat, lon: weather.lon }];
+    const newFavs = [...favorites, { city: weather.city, country: weather.country, state: weather.state, lat: weather.lat, lon: weather.lon }];
     saveFavorites(newFavs);
   };
 

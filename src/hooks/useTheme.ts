@@ -1,34 +1,54 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 
-type Theme = "light" | "dark";
+export type ThemePref = "light" | "dark" | "auto";
+export type EffectiveTheme = "light" | "dark";
+
 const THEME_KEY = "cloudycool_theme";
 
-export const useTheme = () => {
-  const [theme, setThemeState] = useState<Theme>(() => {
+export const useTheme = (sunrise?: number, sunset?: number) => {
+  const [themePref, setThemePref] = useState<ThemePref>(() => {
     try {
-      const saved = localStorage.getItem(THEME_KEY) as Theme | null;
-      if (saved === "light" || saved === "dark") {
-        console.debug("[theme] Loaded from localStorage:", saved);
+      const saved = localStorage.getItem(THEME_KEY) as ThemePref | null;
+      if (saved === "light" || saved === "dark" || saved === "auto") {
         return saved;
       }
     } catch {}
-    const sys = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
-    console.debug("[theme] Using system preference:", sys);
-    return sys;
+    return "auto"; // Auto by default
   });
+
+  const effectiveTheme = useMemo<EffectiveTheme>(() => {
+    if (themePref !== "auto") return themePref;
+    
+    // Auto resolution based on weather sunrise/sunset if available
+    if (sunrise && sunset) {
+      const now = Date.now() / 1000;
+      if (now >= sunrise && now < sunset) {
+        return "light"; // It's daytime
+      }
+      return "dark"; // It's nighttime
+    }
+    
+    // Fallback to system preferred color scheme
+    return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  }, [themePref, sunrise, sunset]);
 
   useEffect(() => {
     const root = document.documentElement;
-    if (theme === "dark") {
+    if (effectiveTheme === "dark") {
       root.classList.add("dark");
     } else {
       root.classList.remove("dark");
     }
-    try { localStorage.setItem(THEME_KEY, theme); } catch {}
-    console.debug("[theme] Applied:", theme);
-  }, [theme]);
+    try { localStorage.setItem(THEME_KEY, themePref); } catch {}
+  }, [effectiveTheme, themePref]);
 
-  const toggleTheme = () => setThemeState((t) => (t === "dark" ? "light" : "dark"));
+  const cycleTheme = () => {
+    setThemePref((t) => {
+      if (t === "auto") return "light";
+      if (t === "light") return "dark";
+      return "auto";
+    });
+  };
 
-  return { theme, toggleTheme };
+  return { themePref, effectiveTheme, cycleTheme };
 };
