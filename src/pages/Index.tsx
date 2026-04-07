@@ -1,8 +1,9 @@
-﻿import { Droplets, Wind, Thermometer, CloudOff, LocateFixed, Info, Sun, Moon, Leaf, Clock, CalendarDays, Download } from "lucide-react";
+import { Droplets, Wind, Thermometer, CloudOff, LocateFixed, Info, Sun, Moon, Leaf, Clock, CalendarDays, Download, Star } from "lucide-react";
 import { useWeather } from "@/hooks/useWeather";
 import { useTheme } from "@/hooks/useTheme";
 import { getWeatherBackground } from "@/lib/weatherBackgrounds";
 import { usePwaInstall } from "@/hooks/usePwaInstall";
+import { useFavorites } from "@/hooks/useFavorites";
 import CitySearch from "@/components/CitySearch";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import type { AqiData, HourlyForecast } from "@/hooks/useWeather";
@@ -32,6 +33,7 @@ const Index = () => {
 
   const { theme, toggleTheme } = useTheme();
   const { canInstall, showIosHint, promptInstall } = usePwaInstall();
+  const { favorites, isFavorite, toggleFavorite } = useFavorites();
 
   const bg = getWeatherBackground(weather?.condition, weather?.icon, theme);
   const aqiTone = aqi ? `hsl(${AQI_COLORS[aqi.index]})` : "rgba(255,255,255,0.8)";
@@ -91,6 +93,30 @@ const Index = () => {
                 onQueryChange={fetchSuggestions}
               />
             </div>
+
+            {favorites.length > 0 && (
+              <div className="mt-3">
+                <ScrollArea className="w-full">
+                  <div className="flex items-center gap-2 pb-1 pt-1 px-1">
+                    {favorites.map((fav, i) => (
+                      <button
+                        key={`${fav.lat}-${fav.lon}-${i}`}
+                        onClick={() => {
+                          setCity(`${fav.city}, ${fav.country}`);
+                          fetchByCoords(fav.lat, fav.lon);
+                        }}
+                        className="flex items-center gap-1.5 whitespace-nowrap rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-xs font-medium text-white shadow-sm backdrop-blur-md transition hover:bg-white/20"
+                      >
+                        <Star className="h-3 w-3 text-yellow-400" fill="currentColor" />
+                        {fav.city}
+                      </button>
+                    ))}
+                  </div>
+                  <ScrollBar orientation="horizontal" className="h-1.5" />
+                </ScrollArea>
+              </div>
+            )}
+
             {showIosHint && (
               <p className="mt-3 text-[11px] text-white/72">
                 On iPhone, tap Share and choose Add to Home Screen.
@@ -126,7 +152,16 @@ const Index = () => {
               <div className="relative flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <p className="text-xs font-medium text-white/75">{weather.country}</p>
-                  <h2 className="truncate text-[1.75rem] font-semibold leading-tight text-white">{weather.city}</h2>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <h2 className="truncate text-[1.75rem] font-semibold leading-tight text-white">{weather.city}</h2>
+                    <button 
+                      onClick={() => toggleFavorite(weather)}
+                      className="transition-transform active:scale-95"
+                      title={isFavorite(weather.lat, weather.lon) ? "Remove from favorites" : "Add to favorites"}
+                    >
+                      <Star className="h-6 w-6 filter drop-shadow-md" fill={isFavorite(weather.lat, weather.lon) ? "#FCD34D" : "rgba(255,255,255,0.15)"} strokeWidth={1} stroke={isFavorite(weather.lat, weather.lon) ? "#FCD34D" : "white"} />
+                    </button>
+                  </div>
                   <p className="mt-1 text-sm capitalize text-white/80">{weather.condition}</p>
                   <p className="mt-2 text-xs text-white/80">{formatTemp(weather.temp)}C / {formatTemp(toFahrenheit(weather.temp))}F</p>
                   {todayForecast && (

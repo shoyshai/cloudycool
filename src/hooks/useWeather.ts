@@ -4,6 +4,8 @@ import { useState, useEffect, useCallback, useRef } from "react";
 export interface WeatherData {
   city: string;
   country: string;
+  lat: number;
+  lon: number;
   temp: number;
   condition: string;
   humidity: number;
@@ -295,6 +297,7 @@ export const useWeather = () => {
       setLocationSource(source);
       setWeather({
         city: displayCity, country: data.sys.country,
+        lat, lon,
         temp: Math.round(data.main.temp), condition: data.weather[0].description,
         humidity: data.main.humidity, windSpeed: data.wind.speed, icon: data.weather[0].icon,
       });
@@ -358,6 +361,7 @@ export const useWeather = () => {
       setLocationSource("manual");
       setWeather({
         city: data.name, country: data.sys.country,
+        lat: data.coord.lat, lon: data.coord.lon,
         temp: Math.round(data.main.temp), condition: data.weather[0].description,
         humidity: data.main.humidity, windSpeed: data.wind.speed, icon: data.weather[0].icon,
       });
