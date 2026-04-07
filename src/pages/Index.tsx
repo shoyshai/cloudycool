@@ -9,6 +9,7 @@ import CitySearch from "@/components/CitySearch";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import WeatherAnimations from "@/components/WeatherAnimations";
 import WeatherAlerts from "@/components/WeatherAlerts";
+import Footer from "@/components/Footer";
 import type { AqiData, HourlyForecast } from "@/hooks/useWeather";
 
 const AboutSection = React.lazy(() => import("@/components/AboutSection"));
@@ -46,7 +47,7 @@ const Index = () => {
   const todayForecast = forecast[0];
 
   return (
-    <div className="relative min-h-screen overflow-x-hidden pb-12 pt-7 text-white transition-all duration-1000" style={{ background: bg.gradient }}>
+    <div className="relative flex min-h-screen flex-col overflow-x-hidden pb-6 pt-7 text-white transition-all duration-1000" style={{ background: bg.gradient }}>
       <div className="pointer-events-none fixed inset-0 transition-all duration-1000" style={{ background: bg.overlay }} />
       <div className="pointer-events-none fixed inset-0 transition-all duration-1000" style={{ backgroundImage: bg.haze }} />
       <div className="pointer-events-none fixed -left-16 -top-16 h-56 w-56 rounded-full blur-3xl animate-float-soft transition-all duration-1000" style={{ backgroundColor: bg.glowA }} />
@@ -55,7 +56,7 @@ const Index = () => {
 
       {weather && <WeatherAnimations condition={weather.condition} />}
 
-      <main className={`${frameClass} relative z-10 flex flex-col gap-3.5`}>
+      <main className={`${frameClass} relative z-10 flex min-h-[calc(100vh-3.25rem)] flex-1 flex-col gap-3.5`}>
         {isOffline && (
           <div className="flex items-center justify-center gap-2 rounded-2xl border border-orange-500/30 bg-orange-500/20 px-4 py-2 text-xs font-semibold text-orange-100 backdrop-blur-xl shadow-lg">
             <WifiOff className="h-4 w-4" />
@@ -289,6 +290,7 @@ const Index = () => {
             </Suspense>
           )}
         </div>
+        <Footer />
       </main>
     </div>
   );
